@@ -60,7 +60,7 @@ Limit scans with `categories` in your config. Use [Dependabot](https://docs.gith
 ## Move an existing setup to automatic updates
 
 Older setups copied one workflow per task, so schedule changes, new tasks and action pins never reached them. Switch once and you won't need to edit workflows again.
-1. Delete your old Milo workflows: every file in `.github/workflows/` that uses `getzeist/milo`.
+1. Delete your old Milo workflows: every file in `.github/workflows/` that uses `zeistapp/milo` or `getzeist/milo`.
 2. Add the `milo.yml` from step 3 above. If you still use a personal token, add `MILO_GITHUB_TOKEN: ${{ secrets.MILO_GITHUB_TOKEN }}` to its `secrets:` block, or [switch to the GitHub App](docs/usage.md#run-milo-as-a-github-app).
 3. Keep your `maintenance` environment, secrets and variables as they are. The `secrets:` block in `milo.yml` is required when your repo has a different owner from `getzeist`: without it GitHub passes empty secrets.
 4. If you used `categories` to limit tasks, keep it. Otherwise Milo scans security, bugs and architecture daily and simplify every third day.
