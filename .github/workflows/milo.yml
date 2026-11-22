@@ -7,7 +7,7 @@ permissions:
   contents: read
 jobs:
   milo:
-    uses: zeistapp/milo/.github/workflows/consumer.yml@main
+    uses: getzeist/milo/.github/workflows/consumer.yml@main
     # Named, because GitHub only inherits secrets within one owner. Keep them in the maintenance environment.
     secrets:
       MILO_GITHUB_TOKEN: ${{ secrets.MILO_GITHUB_TOKEN }}

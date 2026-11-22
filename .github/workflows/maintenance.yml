@@ -75,7 +75,7 @@ jobs:
           esac
       - name: Run Milo
         # Published action, so consumers calling this workflow run Milo rather than their own checkout.
-        uses: zeistapp/milo@main
+        uses: getzeist/milo@main
         with:
           action: ${{ inputs.action }}
           category: ${{ inputs.category }}
