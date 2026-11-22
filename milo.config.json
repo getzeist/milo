@@ -5,7 +5,7 @@
   },
   "repos": [
     {
-      "name": "zeistapp/milo",
+      "name": "getzeist/milo",
       "autoReady": ["simplify"],
       "autoMerge": ["simplify"]
     }
