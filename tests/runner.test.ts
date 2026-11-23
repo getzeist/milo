@@ -593,42 +593,60 @@ test.skipIf(nestedSandboxDenied)(
       expect(await Bun.file(join(logs, log)).text()).toContain("why it broke");
     }),
 );
-test("systemPackages install only where the action sets MILO_APT_ARCHIVES, from the cache before the archive", () =>
+test("systemPackages install only where the action sets MILO_APT_ARCHIVES: installed or cached without the archive", () =>
   temporary("milo-apt-", async (folder) => {
     const calls = join(folder, "calls");
-    // Each sudo call is one line; the offline install fails when OFFLINE=fail, as it does when a package
-    // must be downloaded.
+    const debs = join(folder, "debs");
+    await mkdir(debs);
+    // Stand-ins: sudo logs each privileged command and fails dpkg when DPKG=fail; dpkg-query reports the
+    // packages named in INSTALLED as installed.
     await Bun.write(
       join(folder, "sudo"),
-      `#!/bin/sh\necho "$*" >> '${calls}'\ncase "$*" in *--no-download*) [ "$OFFLINE" != fail ] ;; esac\n`,
+      `#!/bin/sh\necho "$*" >> '${calls}'\n[ "$1" = dpkg ] && [ "$DPKG" = fail ] && exit 1\nexit 0\n`,
+    );
+    await Bun.write(
+      join(folder, "dpkg-query"),
+      `#!/bin/sh\nfor p in $INSTALLED; do [ "$p" = "$3" ] && printf installed && exit 0; done\nexit 1\n`,
     );
     await chmod(join(folder, "sudo"), 0o755);
-    const debs = join(folder, "debs");
-    const install = `apt-get install --yes --no-install-recommends`;
-    const tail = `-o Dir::Cache::Archives=${debs} ffmpeg rsync`;
-    const lines = async () => (await Bun.file(calls).text()).trim().split("\n");
+    await chmod(join(folder, "dpkg-query"), 0o755);
+    const run = async (vars: Record<string, string>) => {
+      await Bun.write(calls, "");
+      for (const [k, v] of Object.entries(vars)) process.env[k] = v;
+      await installPackages(["ffmpeg", "rsync"]);
+      return (await Bun.file(calls).text()).trim().split("\n").filter(Boolean);
+    };
+    const download = [
+      "apt-get update",
+      `apt-get install --yes --no-install-recommends --fix-broken -o Dir::Cache::Archives=${debs} ffmpeg`,
+    ];
     // Milo's own task runs inherit the action's MILO_APT_ARCHIVES.
     const env = {
       PATH: `${folder}:${process.env.PATH}`,
       MILO_APT_ARCHIVES: undefined,
-      OFFLINE: undefined,
+      INSTALLED: undefined,
+      DPKG: undefined,
     };
     await withEnv(env, async () => {
       await installPackages(["ffmpeg"]);
+      expect(existsSync(calls)).toBeFalse();
       process.env.MILO_APT_ARCHIVES = debs;
       await installPackages([]);
       expect(existsSync(calls)).toBeFalse();
-      // Installed or cached: no index update, so no archive.
-      await installPackages(["ffmpeg", "rsync"]);
-      expect(await lines()).toEqual([`${install} --no-download ${tail}`]);
-      await Bun.write(calls, "");
-      // Something to download: the index updates, then the install fetches.
-      process.env.OFFLINE = "fail";
-      await installPackages(["ffmpeg", "rsync"]);
-      expect(await lines()).toEqual([
-        `${install} --no-download ${tail}`,
-        "apt-get update",
-        `${install} ${tail}`,
+      // Installed: nothing runs, so nothing reaches the archive.
+      expect(await run({ INSTALLED: "ffmpeg rsync" })).toEqual([]);
+      // Missing and not cached: the index updates and only the missing package downloads.
+      expect(await run({ INSTALLED: "rsync" })).toEqual(download);
+      // Missing and cached: dpkg installs the newest cached file, no update.
+      await Bun.write(join(debs, "ffmpeg_7.0_amd64.deb"), "");
+      await Bun.write(join(debs, "ffmpeg_7.1_amd64.deb"), "");
+      expect(await run({})).toEqual([
+        `dpkg -i ${join(debs, "ffmpeg_7.1_amd64.deb")}`,
+      ]);
+      // A cached file dpkg can't install (a missing dependency) falls back to the archive.
+      expect(await run({ DPKG: "fail" })).toEqual([
+        `dpkg -i ${join(debs, "ffmpeg_7.1_amd64.deb")}`,
+        ...download,
       ]);
     });
   }));
