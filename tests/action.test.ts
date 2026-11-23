@@ -103,6 +103,40 @@ test("distributed action reads the caller's config from an external working dire
     });
   }));
 
+test("the system package cache starts afresh each ISO week, so a warm cache can't keep old versions", () =>
+  temporary("milo-apt-key-", async (folder) => {
+    const install = action.runs.steps.find(
+      (step) => step.name === "Prepare system packages",
+    )?.run;
+    if (!install) throw new Error("Missing system package step");
+    // A Linux runner's view: the CLI lists a package, and date answers the ISO week only when asked for it.
+    const bin = join(folder, "bin");
+    await Bun.write(join(bin, "bun"), "#!/bin/sh\necho ffmpeg\n");
+    await Bun.write(
+      join(bin, "date"),
+      '#!/bin/sh\n[ "$*" = "-u +%G-%V" ] && echo 2026-48\n',
+    );
+    await command(["chmod", "755", join(bin, "bun"), join(bin, "date")]);
+    const output = join(folder, "output");
+    const env = {
+      PATH: `${bin}:${process.env.PATH}`,
+      MILO_ACTION_PATH: root,
+      INPUT_CONFIG: "milo.config.json",
+      RUNNER_OS: "Linux",
+      RUNNER_TEMP: folder,
+      RUNNER_ARCH: "X64",
+      ImageOS: "ubuntu24",
+      ImageVersion: "20261116.1",
+      GITHUB_OUTPUT: output,
+    };
+    await withEnv(env, async () => {
+      await command(["bash", "-c", install], { cwd: folder });
+    });
+    expect((await Bun.file(output).text()).trim()).toBe(
+      "prefix=milo-apt-ubuntu24-20261116.1-X64-2026-48-",
+    );
+  }));
+
 test("maintenance preflight installs only the configured provider's agent", () =>
   temporary("milo-preflight-", async (folder) => {
     const workflow = Bun.YAML.parse(

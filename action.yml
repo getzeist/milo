@@ -45,7 +45,9 @@ runs:
     # Sandboxed steps cannot use sudo, so Milo installs a repo's systemPackages with apt-get, outside the
     # sandbox, just before that repo's first setup step. Most runs never set up a repo and skip the install.
     # A slow apt mirror once took 25 minutes to send 64 MB, so the .deb files are cached per runner image.
-    # apt checks each cached file against the signed index and downloads any that don't match.
+    # scripts/apt-install.sh installs a cached file with dpkg, which skips apt's check against the signed index, so the
+    # cache's integrity rests on GitHub's cache scoping (a pull request writes only its own branch's scope). Files apt
+    # downloads are checked as before.
     - name: Prepare system packages
       id: apt
       shell: bash
@@ -59,7 +61,8 @@ runs:
           exit 0
         fi
         mkdir -p "$RUNNER_TEMP/milo-apt"
-        echo "prefix=milo-apt-$ImageOS-$ImageVersion-$RUNNER_ARCH-" >> "$GITHUB_OUTPUT"
+        # The ISO week starts a new cache weekly, so a warm cache can't keep a package's version past a week.
+        echo "prefix=milo-apt-$ImageOS-$ImageVersion-$RUNNER_ARCH-$(date -u +%G-%V)-" >> "$GITHUB_OUTPUT"
     - id: restore
       if: steps.apt.outputs.prefix
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -80,13 +83,14 @@ runs:
       run: |
         sudo sysctl -w kernel.core_pattern=core
         sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL > /dev/null 2>&1 &
-    # Setup and check steps run under bubblewrap; the Claude adapter's shell sandbox also needs socat.
+    # Setup and check steps run under bubblewrap; the Claude adapter's shell sandbox also needs socat. Installed or
+    # cached, they install without the package archive (scripts/apt-install.sh).
     - name: Install sandbox
       if: runner.os == 'Linux'
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install --yes -o Dir::Cache::Archives="$RUNNER_TEMP/milo-apt" bubblewrap socat
+        mkdir -p "$RUNNER_TEMP/milo-apt"
+        "$GITHUB_ACTION_PATH/scripts/apt-install.sh" "$RUNNER_TEMP/milo-apt" bubblewrap socat
         if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || true)" = '1' ] && [ ! -e /etc/apparmor.d/bwrap ]; then
           printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' 'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '}' | sudo tee /etc/apparmor.d/bwrap >/dev/null
           sudo apparmor_parser -r /etc/apparmor.d/bwrap
