@@ -284,23 +284,36 @@ export function keptLog(name: string): string | undefined {
 }
 // The action sets MILO_APT_ARCHIVES on Linux runners, its cached .deb folder. Local runs install nothing.
 // The config schema allows only Debian package names, so none can pass as an apt option.
+// Installed or cached packages install without the archive; the index is updated only when something must be
+// downloaded (a slow archive once ran a check job out of time, zeist, 23 November).
 export async function installPackages(packages: string[] = []): Promise<void> {
   const archives = process.env.MILO_APT_ARCHIVES;
   if (!archives || !packages.length) return;
   const started = performance.now();
-  await command(
-    [
-      "sudo",
-      "apt-get",
-      "install",
-      "--yes",
-      "--no-install-recommends",
-      "-o",
-      `Dir::Cache::Archives=${archives}`,
-      ...packages,
-    ],
-    { timeoutSeconds: 1800, label: "apt-get install" },
-  );
+  const install = (...options: string[]) =>
+    command(
+      [
+        "sudo",
+        "apt-get",
+        "install",
+        "--yes",
+        "--no-install-recommends",
+        ...options,
+        "-o",
+        `Dir::Cache::Archives=${archives}`,
+        ...packages,
+      ],
+      { timeoutSeconds: 1800, label: "apt-get install" },
+    );
+  try {
+    await install("--no-download");
+  } catch {
+    await command(["sudo", "apt-get", "update"], {
+      timeoutSeconds: 1800,
+      label: "apt-get update",
+    });
+    await install();
+  }
   const seconds = (performance.now() - started) / 1000;
   console.log(
     `systemPackages ${JSON.stringify(packages)} took ${seconds.toFixed(1)} s`,

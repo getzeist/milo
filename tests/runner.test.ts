@@ -593,34 +593,42 @@ test.skipIf(nestedSandboxDenied)(
       expect(await Bun.file(join(logs, log)).text()).toContain("why it broke");
     }),
 );
-test("systemPackages install only where the action sets MILO_APT_ARCHIVES", () =>
+test("systemPackages install only where the action sets MILO_APT_ARCHIVES, from the cache before the archive", () =>
   temporary("milo-apt-", async (folder) => {
-    const args = join(folder, "args");
+    const calls = join(folder, "calls");
+    // Each sudo call is one line; the offline install fails when OFFLINE=fail, as it does when a package
+    // must be downloaded.
     await Bun.write(
       join(folder, "sudo"),
-      `#!/bin/sh\nprintf '%s\\n' "$@" > '${args}'\n`,
+      `#!/bin/sh\necho "$*" >> '${calls}'\ncase "$*" in *--no-download*) [ "$OFFLINE" != fail ] ;; esac\n`,
     );
     await chmod(join(folder, "sudo"), 0o755);
+    const debs = join(folder, "debs");
+    const install = `apt-get install --yes --no-install-recommends`;
+    const tail = `-o Dir::Cache::Archives=${debs} ffmpeg rsync`;
+    const lines = async () => (await Bun.file(calls).text()).trim().split("\n");
     // Milo's own task runs inherit the action's MILO_APT_ARCHIVES.
     const env = {
       PATH: `${folder}:${process.env.PATH}`,
       MILO_APT_ARCHIVES: undefined,
+      OFFLINE: undefined,
     };
     await withEnv(env, async () => {
       await installPackages(["ffmpeg"]);
-      process.env.MILO_APT_ARCHIVES = join(folder, "debs");
+      process.env.MILO_APT_ARCHIVES = debs;
       await installPackages([]);
-      expect(existsSync(args)).toBeFalse();
+      expect(existsSync(calls)).toBeFalse();
+      // Installed or cached: no index update, so no archive.
       await installPackages(["ffmpeg", "rsync"]);
-      expect((await Bun.file(args).text()).trim().split("\n")).toEqual([
-        "apt-get",
-        "install",
-        "--yes",
-        "--no-install-recommends",
-        "-o",
-        `Dir::Cache::Archives=${join(folder, "debs")}`,
-        "ffmpeg",
-        "rsync",
+      expect(await lines()).toEqual([`${install} --no-download ${tail}`]);
+      await Bun.write(calls, "");
+      // Something to download: the index updates, then the install fetches.
+      process.env.OFFLINE = "fail";
+      await installPackages(["ffmpeg", "rsync"]);
+      expect(await lines()).toEqual([
+        `${install} --no-download ${tail}`,
+        "apt-get update",
+        `${install} ${tail}`,
       ]);
     });
   }));

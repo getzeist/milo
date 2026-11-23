@@ -81,12 +81,18 @@ runs:
         sudo sysctl -w kernel.core_pattern=core
         sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL > /dev/null 2>&1 &
     # Setup and check steps run under bubblewrap; the Claude adapter's shell sandbox also needs socat.
+    # Installed or cached packages install without the archive: apt-get update runs only when something must be
+    # downloaded. A slow archive once ran a check job out of time before it reached a check (zeist, 23 November).
     - name: Install sandbox
       if: runner.os == 'Linux'
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install --yes -o Dir::Cache::Archives="$RUNNER_TEMP/milo-apt" bubblewrap socat
+        archives="$RUNNER_TEMP/milo-apt"
+        mkdir -p "$archives"
+        if ! sudo apt-get install --yes --no-download -o Dir::Cache::Archives="$archives" bubblewrap socat; then
+          sudo apt-get update
+          sudo apt-get install --yes -o Dir::Cache::Archives="$archives" bubblewrap socat
+        fi
         if [ "$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || true)" = '1' ] && [ ! -e /etc/apparmor.d/bwrap ]; then
           printf '%s\n' 'abi <abi/4.0>,' 'include <tunables/global>' 'profile bwrap /usr/bin/bwrap flags=(unconfined) {' '  userns,' '}' | sudo tee /etc/apparmor.d/bwrap >/dev/null
           sudo apparmor_parser -r /etc/apparmor.d/bwrap
