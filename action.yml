@@ -45,7 +45,9 @@ runs:
     # Sandboxed steps cannot use sudo, so Milo installs a repo's systemPackages with apt-get, outside the
     # sandbox, just before that repo's first setup step. Most runs never set up a repo and skip the install.
     # A slow apt mirror once took 25 minutes to send 64 MB, so the .deb files are cached per runner image.
-    # apt checks each cached file against the signed index and downloads any that don't match.
+    # scripts/apt-install.sh installs a cached file with dpkg, which skips apt's check against the signed index, so the
+    # cache's integrity rests on GitHub's cache scoping (a pull request writes only its own branch's scope). Files apt
+    # downloads are checked as before.
     - name: Prepare system packages
       id: apt
       shell: bash
