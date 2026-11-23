@@ -61,7 +61,8 @@ runs:
           exit 0
         fi
         mkdir -p "$RUNNER_TEMP/milo-apt"
-        echo "prefix=milo-apt-$ImageOS-$ImageVersion-$RUNNER_ARCH-" >> "$GITHUB_OUTPUT"
+        # The ISO week starts a new cache weekly, so a warm cache can't keep a package's version past a week.
+        echo "prefix=milo-apt-$ImageOS-$ImageVersion-$RUNNER_ARCH-$(date -u +%G-%V)-" >> "$GITHUB_OUTPUT"
     - id: restore
       if: steps.apt.outputs.prefix
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
