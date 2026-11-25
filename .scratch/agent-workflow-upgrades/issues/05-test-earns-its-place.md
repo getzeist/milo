@@ -9,6 +9,7 @@ Before deleting a test, check it is not the last guard on a real rule; if it is,
 **Status:** done in a0ee778
 
 The bar lives once in the Code section of `src/guidelines.txt`; the simplify area and the review prompt refer to it as "the test bar".
+
 - [x] The simplify area names the test bar and the five kinds of test that fail it
 - [x] Simplify deletions keep the last guard on each real rule and keep regression tests
 - [x] The review prompt flags new tests that fail the bar
