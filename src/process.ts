@@ -283,20 +283,17 @@ export function keptLog(name: string): string | undefined {
   return join(dir, `${String(++kept).padStart(3, "0")}-${slug}.log`);
 }
 // The action sets MILO_APT_ARCHIVES on Linux runners, its cached .deb folder. Local runs install nothing.
-// The config schema allows only Debian package names, so none can pass as an apt option.
+// The config schema allows only Debian package names, so none can pass as an apt option. Installed or cached
+// packages install without the package archive (scripts/apt-install.sh).
 export async function installPackages(packages: string[] = []): Promise<void> {
   const archives = process.env.MILO_APT_ARCHIVES;
   if (!archives || !packages.length) return;
   const started = performance.now();
   await command(
     [
-      "sudo",
-      "apt-get",
-      "install",
-      "--yes",
-      "--no-install-recommends",
-      "-o",
-      `Dir::Cache::Archives=${archives}`,
+      "bash",
+      join(import.meta.dir, "../scripts/apt-install.sh"),
+      archives,
       ...packages,
     ],
     { timeoutSeconds: 1800, label: "apt-get install" },

@@ -119,7 +119,7 @@ test("one consumer workflow works approved tickets and runs daily scans on every
   });
   for (const job of [consumer.jobs.tasks, consumer.jobs.reviews]) {
     expect(job.uses).toBe(
-      "zeistapp/milo/.github/workflows/maintenance.yml@main",
+      "getzeist/milo/.github/workflows/maintenance.yml@main",
     );
     expect(job.secrets).toEqual(forwarded);
   }
@@ -129,7 +129,7 @@ test("one consumer workflow works approved tickets and runs daily scans on every
   };
   // Cross-owner callers receive no inherited secrets, so each level names them.
   expect(caller.jobs.milo).toEqual({
-    uses: "zeistapp/milo/.github/workflows/consumer.yml@main",
+    uses: "getzeist/milo/.github/workflows/consumer.yml@main",
     secrets: forwarded,
   });
   const shared = Bun.YAML.parse(
