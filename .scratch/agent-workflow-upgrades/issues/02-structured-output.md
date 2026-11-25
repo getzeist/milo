@@ -11,6 +11,7 @@ The custom `agent.command` provider has no schema flag. Keep the text parsing fo
 **Status:** done in 4cb3020
 
 Claude Code repairs invalid structured output in-session and fails with `error_max_structured_output_retries`, so Milo keeps `--no-session-persistence` and has no resume step. Custom `agent.command` gets a `{schema}` path and must write matching JSON. Schemas use Zod's draft-07 target; the CLI rejects 2020-12. Checked live on 2.1.296 and 2.1.312.
+
 - [x] Scan, verify and review results are parsed from a validated schema for the Claude provider
 - [x] A malformed result triggers one in-session repair attempt before the run fails
 - [x] Text parsing that only served the Claude provider is deleted

@@ -58,6 +58,7 @@ Turbo spends fast: up to `--agents` calls at once, each capped at `maxBudgetUsd`
 ### Run turbo on your machine
 
 Do this setup once.
+
 1. Run `claude setup-token` and copy the token it prints. It uses your Claude subscription instead of API credits and lasts about a year.
 2. Store it in the macOS keychain. Paste the token when asked for a password:
 
@@ -166,6 +167,7 @@ Existing `agent.command` configs still work for custom agents. Choose either `pr
 ## Run Milo as a GitHub App
 
 With a personal token, Milo's issues and PRs show as you, so you can't approve its PRs, and the token expires. A GitHub App gives Milo its own `<app-name>[bot]` identity for issues, PRs, comments and commits, with tokens that renew on every run.
+
 1. [Register an App](https://github.com/settings/apps/new?url=https://github.com/getzeist/milo&public=true&webhook_active=false&contents=write&issues=write&pull_requests=write&checks=read&statuses=read). The link fills in the permissions Milo needs: Contents, Issues and Pull requests write; Checks and Commit statuses read. Pick a name no GitHub user or App already has. For an organization, open the same link with `https://github.com/organizations/ORG/settings/apps/new` instead.
 2. On the App's settings page, note the Client ID. Then open **Credentials → Key pairs** in the left sidebar and click **New key** to download a private key.
 3. Install the App on every repo Milo maintains.
@@ -202,6 +204,7 @@ Require target-repo CI and human approval through branch rules, dismissing stale
 ## Automatic merging
 
 List categories in a repo's `autoMerge` to let Milo merge their PRs without a human, for example `"autoReady": ["simplify"], "autoMerge": ["simplify"]`. Milo merges a PR only when all of these hold:
+
 - The reviewer agent's verdict is `merge` (minor, non-breaking, in scope and tested), and it rates the change a two-way door. A one-way door, such as a public API, stored data format, migration or user-visible behaviour change, waits for a human.
 - The change is at most 300 lines outside lockfiles, has no binary files, and adds or removes no dependencies or package manifests.
 - Every changed dependency is a plain semver version and stays within its current major (or minor below 1.0).
